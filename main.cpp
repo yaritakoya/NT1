@@ -16,13 +16,13 @@ constexpr unsigned short kTextType = 1;
 constexpr int kMaxBodySize = 1024;
 
 unsigned short ReadUInt16(const char* bytes) {
-	return static_cast<unsigned short>((static_cast<unsigned char>(bytes[0]) << 8) |
-	                                    static_cast<unsigned char>(bytes[1]));
+	unsigned short value = 0;
+	memcpy(&value, bytes, sizeof(value));
+	return value;
 }
 
 void WriteUInt16(char* bytes, unsigned short value) {
-	bytes[0] = static_cast<char>((value >> 8) & 0xff);
-	bytes[1] = static_cast<char>(value & 0xff);
+	memcpy(bytes, &value, sizeof(value));
 }
 
 bool SendAll(SOCKET socket, const char* data, int length, int& totalSent) {
@@ -61,7 +61,7 @@ void CloseSocket(SOCKET& socket) {
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Novice::Initialize("NT1_01_00", 640, 360);
 	char host[64] = "34.104.202.113";
-	char port[8] = "8001";
+	char port[8] = "8000";
 	bool connected = false;
 
 	WSADATA wsaData{};
@@ -70,7 +70,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	int receivedBytes = 0;
 
 	char text[256] = "";
-	char echo[256] = "";
+	char echo[kMaxBodySize + 1] = "";
 	char message[128] = "";
 
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -144,8 +144,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			const int bodyLength = static_cast<int>(strlen(text));
 			if (bodyLength == 0) {
 				strcpy_s(message, sizeof(message), "Text is empty");
-			} else if (bodyLength > 0xffff) {
-				strcpy_s(message, sizeof(message), "Text is too long");
 			} else {
 				char header[kHeaderSize]{};
 				WriteUInt16(header, static_cast<unsigned short>(bodyLength));
@@ -172,12 +170,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 							strcpy_s(message, sizeof(message), "Invalid response header");
 							ok = false;
 						} else {
-						int bodyReceived = 0;
-						ok = ReceiveExact(sock, echo, responseLength, bodyReceived);
-						receivedBytes += bodyReceived;
-						echo[bodyReceived] = '\0';
-						if (ok) {
-						strcpy_s(message, sizeof(message), "Reply received");
+							int bodyReceived = 0;
+							ok = ReceiveExact(sock, echo, responseLength, bodyReceived);
+							receivedBytes += bodyReceived;
+							echo[bodyReceived] = '\0';
+							if (ok) {
+								strcpy_s(message, sizeof(message), "Reply received");
+							}
 						}
 					}
 				}
